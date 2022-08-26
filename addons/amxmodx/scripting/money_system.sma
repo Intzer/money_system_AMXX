@@ -1,9 +1,14 @@
-#include <cstrike>
 #include <amxmodx>
 #include <nvault>
 #include <sqlx>
 
+#if AMXX_VERSION_NUM < 183
+	#include <colorchat>
+	#define create_cvar register_cvar
+#endif
+
 #define CONFIG_FILE "plugin-money_system"
+#define TASK_MESSAGE 25252
 
 new g_money[33]
 new bool:g_cansave[33]
@@ -20,7 +25,7 @@ new ms_money_limit
 
 public plugin_init()
 {
-	register_plugin("Money System", "18.07.2022", "Oli")
+	register_plugin("Money System", "26.08.2022", "Oli")
 
 	create_cvar("ms_use_mysql", "0")
 	create_cvar("ms_mysql_host", "localhost")
@@ -29,7 +34,7 @@ public plugin_init()
 	create_cvar("ms_mysql_dbname", "dbname")
 	create_cvar("ms_money_limit", "1000")
 
-	server_cmd("exec addons/amxmodx/configs/plugin/%s.cfg", CONFIG_FILE)
+	server_cmd("exec addons/amxmodx/configs/plugins/%s.cfg", CONFIG_FILE)
 	server_exec()
 	handle_cvars()
 }
@@ -61,6 +66,10 @@ public sql_init()
 		set_fail_state(szError)
 	}
 	SQL_FreeHandle(mysql_connection)
+
+	new szQuery[256]
+	formatex(szQuery, charsmax(szQuery), "CREATE TABLE IF NOT EXISTS `money_system` (`id` INT NOT NULL AUTO_INCREMENT , `steam_id` VARCHAR(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL , `money` INT NOT NULL , PRIMARY KEY (`id`)) ENGINE = InnoDB CHARSET=utf8 COLLATE utf8_general_ci;")
+	SQL_ThreadQuery(g_mysql_tuple, "ignore_handler", szQuery)
 }
 
 public client_putinserver(id)
@@ -76,6 +85,7 @@ public client_disconnect(id)
 	g_money[id] = 0
 	g_cansave[id] = false
 	g_newuser[id] = false
+	remove_task(id+TASK_MESSAGE)
 }
 
 public load_data(id)
@@ -101,6 +111,7 @@ public load_data(id)
 	{
 		g_money[id] = min(ms_money_limit, nvault_get(g_nvault, szSteamID))
 		g_cansave[id] = true
+		get_message_pre(id)
 	}
 }
 
@@ -121,11 +132,12 @@ public load_data_handler(failstate, Handle:query, error[], errnum, data[], size,
 		return PLUGIN_HANDLED
 
 	if (SQL_NumResults(query) > 0)
-		g_money[id] = SQL_ReadResult(query, 2)
+		g_money[id] = min(ms_money_limit, SQL_ReadResult(query, 2))
 	else
 		g_newuser[id] = true
 
 	g_cansave[id] = true
+	get_message_pre(id)
 	return PLUGIN_HANDLED
 }
 
@@ -160,6 +172,17 @@ public ignore_handler(failstate, Handle:query, error[], errnum, data[], size, Fl
 		log_amx(error)
 
 	return PLUGIN_HANDLED
+}
+
+public get_message_pre(id)
+{
+	set_task(5.0, "get_message", id+TASK_MESSAGE)
+}
+
+public get_message(taskid)
+{
+	new id = taskid-TASK_MESSAGE
+	client_print_color(id, 0, "^4[SAVE] ^1Сохранение монет активировано. Лимит сохранения - ^3%d^1!", ms_money_limit)
 }
 
 public plugin_end()
