@@ -39,6 +39,15 @@ public plugin_init()
 	handle_cvars()
 }
 
+public plugin_natives()
+{
+	register_native("ms_set_user_money", "native_ms_set_user_money", 1)
+	register_native("ms_get_user_money", "native_ms_get_user_money", 1)
+}
+
+public native_ms_set_user_money(id, amount) g_money[id] = amount
+public native_ms_get_user_money(id) return g_money[id]
+
 public handle_cvars()
 {
 	ms_use_mysql = get_cvar_num("ms_use_mysql")
@@ -67,7 +76,7 @@ public sql_init()
 	}
 	SQL_FreeHandle(mysql_connection)
 
-	new szQuery[256]
+	new szQuery[512]
 	formatex(szQuery, charsmax(szQuery), "CREATE TABLE IF NOT EXISTS `money_system` (`id` INT NOT NULL AUTO_INCREMENT , `steam_id` VARCHAR(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL , `money` INT NOT NULL , PRIMARY KEY (`id`)) ENGINE = InnoDB CHARSET=utf8 COLLATE utf8_general_ci;")
 	SQL_ThreadQuery(g_mysql_tuple, "ignore_handler", szQuery)
 }
